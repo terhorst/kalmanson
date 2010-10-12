@@ -2,6 +2,7 @@ import sys, os, re
 # import multiprocessing
 # import multiprocessing.dummy as multiprocessing
 from multiprocessing_jth import pyprocessing
+from matrify import matrify
 import numpy as np
 from itertools import izip_longest, combinations, ifilter, imap
 import itertools as it
@@ -13,8 +14,20 @@ import utility_matrices as um
 np.set_printoptions(linewidth=100)
 
 # Utility functions
+@matrify
+def conjugate(D,M):
+    "Return matrix conjugation (D^T)*M*D."
+    return np.dot(np.array(D).T, np.dot(M, D))
+    
+
 def textual_vector(n):
     return textual_symmetric_matrix(n)[triu_indices(n,1)]
+
+def symmetric_matrix(n, triu):
+    "Make a symmetric nxn matrix from upper triangular entries triu."
+    A = np.zeros([n,n], dtype=int)
+    A[triu_indices(n,1)] = triu
+    return A + A.T
 
 def rowsums(M):
     return map(sum, M)
@@ -394,12 +407,16 @@ def look_for_patterns(n,m):
     cols = [vec for (((mat,vec),kwd),ret) in P(check_cols)(args) if ret]
     # cols = pool_filter(p, it.product([A], combinations_iterator(range(A.ncols()), m))) 
     # cols = filter(check_cols, combinations(range(A.ncols()), m))
-
+    
+    ret = []
     for col in cols:
         desc = tv[col]
         vec = np.zeros(binomial(n,2), dtype=int)
         vec[col] = 1
+        ret.append([col, desc, vec])
         print "%s\t%s\t%s" % (desc, np.dot(A,vec), vec)
+        print symmetric_matrix(n, vec)
+    return ret 
 
 def pretty_print_patterns(n):
     vecs = look_for_patterns(n)
@@ -425,4 +442,14 @@ def ray_basis_pp(vecs, do_sort=True):
             #lambda a,b: cmp(a,b) if len(a)==len(b) else cmp(len(a),len(b))))
     else:
         print "\n".join(map(str,vecs))
+
+@matrify
+def type1_ray(n,m):
+    M = np.array(um.E(n,m))
+    M[m,:] = M[:,m] = 0
+    return M
+
+@matrify
+def ray_D(n, m):
+    return np.diag([1]*m + [0] + [1]*(n-m-1))
 

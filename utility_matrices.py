@@ -1,14 +1,6 @@
 import numpy as np
 from sage.all import Set, Matrix, vector
-from functools import wraps
-
-def matrify(f):
-    @wraps(f)
-    def wrapper(*args):
-        mat = Matrix(f(*args))
-        mat.set_immutable()
-        return mat
-    return wrapper
+from matrify import matrify
     
 @matrify
 def V(n, i, j=None):
@@ -21,18 +13,6 @@ def V(n, i, j=None):
     else:
         M[0:(i+1), (i+1):(n+1)] = 1
     return M
-
-@matrify
-def E(n, i, j=None):
-    M = np.zeros([n,n], dtype=np.int)
-    if j:
-        M[i,j] = 1
-        return M
-    else:
-        M[i, :] = 1
-        M[:, i] = 1
-        M[i,i] = 0
-        return M
 
 @matrify
 def A(n, i, j=None):
