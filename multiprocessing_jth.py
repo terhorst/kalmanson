@@ -14,7 +14,7 @@ Parallel Iterator built using Python's multiprocessing module
 from multiprocessing import Pool
 from functools import partial
 from sage.misc.fpickle import pickle_function, call_pickled_function
-import ncpus
+import sage.parallel.ncpus as ncpus
 
 def pyprocessing(processes=0):
     """
@@ -63,8 +63,9 @@ def parallel_iter(processes, f, inputs):
     if processes == 0: processes = ncpus.ncpus()
     p = Pool(processes)
     fp = pickle_function(f)
-    
-    result = p.imap_unordered(call_pickled_function, [ (fp, t) for t in inputs ], processes / len(inputs))
+   
+    args = [ (fp,t) for t in inputs ]
+    result = p.imap_unordered(call_pickled_function, args, len(args))
     for res in result:
         yield res
 

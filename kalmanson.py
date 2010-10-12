@@ -1,7 +1,7 @@
 import sys, os, re
 # import multiprocessing
 # import multiprocessing.dummy as multiprocessing
-from sage.parallel.multiprocessing_sage import pyprocessing
+from multiprocessing_jth import pyprocessing
 import numpy as np
 from itertools import izip_longest, combinations, ifilter, imap
 import itertools as it
@@ -388,7 +388,7 @@ def look_for_patterns(n,m):
     tv = textual_vector(n)
     inds = range(A.ncols())
 
-    p_iter = pyprocessing(7)
+    p_iter = pyprocessing(8)
     P = parallel(p_iter=p_iter)
     args = list(it.product([A], combinations_iterator(range(A.ncols()), m)))
     cols = [vec for (((mat,vec),kwd),ret) in P(check_cols)(args) if ret]
