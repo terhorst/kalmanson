@@ -362,8 +362,12 @@ def check_valid(A,Mnp,inds):
 
 def nonzero_entries(v):
     "Return the number of non-zero entries in the vector v."
+    return nonzero_indices(v).shape[0]
+
+def nonzero_indices(v):
+    "Return the indices where v is nonzero."
     v = np.array(v)
-    return np.nonzero(v)[0].shape[0]
+    return np.nonzero(v)[0]
 
 def lonely_columns(M):
     "Return column indices of M which have only one non-zero entry."
