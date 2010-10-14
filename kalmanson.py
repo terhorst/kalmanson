@@ -268,7 +268,7 @@ def make_cone(p):
 def kalmanson_cones(n):
     R = rays(n)
     ray_sets = Set([Set([permute_matrix(g,M) for M in R]) for g in SymmetricGroup(n)])
-    p_iter = sage.parallel.use_fork.p_iter_fork(4,30)
+    p_iter = sage.parallel.use_fork.p_iter_fork(sage.parallel.ncpus.ncpus() * 2,30)
     P = parallel(p_iter=p_iter)
     return [ret for ((poly,kwd),ret) in P(make_cone)(ray_sets.list())]
 
