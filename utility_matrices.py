@@ -36,7 +36,6 @@ def A(n, i, j=None):
         M[0:(i+1), (i+1):(n+1)] = 1
     return M
 
-@symmetrize
 @matrify
 def E(n, i, j=None):
     M = np.zeros([n,n], dtype=np.int)

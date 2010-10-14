@@ -30,6 +30,7 @@ def conjugate(D,M):
 def textual_vector(n):
     return textual_symmetric_matrix(n)[triu_indices(n,1)]
 
+@matrify
 def symmetric_matrix(n, triu):
     "Make a symmetric nxn matrix from upper triangular entries triu."
     A = np.zeros([n,n], dtype=int)
@@ -267,7 +268,7 @@ def make_cone(p):
 def kalmanson_cones(n):
     R = rays(n)
     ray_sets = Set([Set([permute_matrix(g,M) for M in R]) for g in SymmetricGroup(n)])
-    p_iter = pyprocessing(8)
+    p_iter = sage.parallel.use_fork.p_iter_fork(4,30)
     P = parallel(p_iter=p_iter)
     return [ret for ((poly,kwd),ret) in P(make_cone)(ray_sets.list())]
 
@@ -325,128 +326,15 @@ def textual_rays(n):
     tsm = textual_symmetric_matrix(5)
     return map(list, [tsm[np.nonzero(np.triu(r,1))] for r in rays(n)])
 
-def fixing_except(notfixed):
-    n = notfixed.ncols()
-    R = rays(n)
-    nf_orbit = orbit(notfixed)
-    dontfix = reduce(lambda x,y: x.union(y), [Set(nf_orbit[k]) for k in nf_orbit.keys() \
-            if k not in R])
-    R.remove(notfixed)
-    orbits = dict(zip(R, map(orbit, R)))
-    dofix = [reduce(lambda x,y: x.union(y), [Set(orbits[r][k]) for k in orbits[r].keys() \
-            if k in R]) for r in orbits.keys()]
-    fixers = reduce(lambda x,y: x.intersection(y), dofix)
-    
-def ray_matrices(n):
-    A,B = positive_lineality_space(n),std_kalmanson_polyhedron(n)
-    return map(matrix, [m.rays() for m in (A,B)]) 
-
-def build_ray_matrix(M):
-    # There will by (nC2 - n) rays. Each is nC2-dimensional.
-    n = M.nrows()
-    m = M.ncols()
-    A = zero_matrix(n, m)
-    # The matrix contains n columns with only a -1.
-    
-    single_cols = lonely_columns(M)
-    assert len(single_cols) >= A.nrows()
-    single_cols = single_cols[:A.nrows()]
-    
-    cols = M.columns()
-
-    for col in single_cols:
-        row = np.nonzero(cols[col])[0][0]
-        assert M[row,col] == -1
-        A[row,col] = 1
-        
-    return A
-
-# @parallel(ncpus=8, p_iter="multiprocessing")
-def check_valid(A,Mnp,inds):
-    inds = np.array(inds)[:,:,0]
-    B = np.array(A, dtype=np.int)
-    B[inds[:,0], inds[:,1]] = 1
-    print B
-    C = np.dot(Mnp,B.T)
-    cond = np.all(C>=0) and np.all(np.sum(C,0) == 1) and np.all(np.sum(C,1)==1)
-    return cond
-
-def nonzero_entries(v):
-    "Return the number of non-zero entries in the vector v."
-    return nonzero_indices(v).shape[0]
-
-def nonzero_indices(v):
-    "Return the indices where v is nonzero."
-    v = np.array(v)
-    return np.nonzero(v)[0]
-
-def lonely_columns(M):
-    "Return column indices of M which have only one non-zero entry."
-    return filter(lambda i: nonzero_entries(M[:,i])==1, range(M.ncols()))
-
-def social_columns(M):
-    return list(Set(range(M.ncols())) - Set(lonely_columns(M)))
-
-def make_ones_matrix(dim, spots):
-    r = len(spots)
-    M = np.zeros([r, dim], dtype=int)
-    for i,inds in enumerate(spots):
-        M[i,inds] = 1
-    return matrix(M).transpose()
-
-def submatrices_with_column(A, col, k):
-    rng = range(A.ncols())
-    rng.remove(col)
-    submat = A.matrix_from_columns(rng)
-    return filter(partial(check_cols, A), \
-            imap(lambda (x,y): Set((x,)+y), product([col], combinations(rng,k))))
-
-def check_cols(A,cols):
-    from kalmanson import rowsums, number_of_nonzero
-    cols = list(cols)
-    rs = rowsums(A.matrix_from_columns(cols))
-    return sum(rs)==1 and number_of_nonzero(rs)==1
-
-def pool_filter(pool, iter):
-    a,b = it.tee(iter)
-    return [cols for (mat,cols), keep in it.izip(a, pool.imap(check_cols, b)) if keep]
-
-def look_for_patterns(n,m):
-    A = kalmanson_matrix(n)
-    tv = textual_vector(n)
-    inds = range(A.ncols())
-
-    p_iter = pyprocessing(8)
-    P = parallel(p_iter=p_iter)
-    args = list(it.product([A], combinations_iterator(range(A.ncols()), m)))
-    cols = [vec for (((mat,vec),kwd),ret) in P(check_cols)(args) if ret]
-    # cols = pool_filter(p, it.product([A], combinations_iterator(range(A.ncols()), m))) 
-    # cols = filter(check_cols, combinations(range(A.ncols()), m))
-    
-    ret = []
-    for col in cols:
-        desc = tv[col]
-        vec = np.zeros(binomial(n,2), dtype=int)
-        vec[col] = 1
-        ret.append([col, desc, vec])
-        print "%s\t%s\t%s" % (desc, np.dot(A,vec), vec)
-        print symmetric_matrix(n, vec)
-    return ret 
-
-def pretty_print_patterns(n):
-    vecs = look_for_patterns(n)
-    for k in sorted(vecs.keys()):
-        print "%i\t%s\t%s\t%s\t%s" % (k, vecs[k][0][0], vecs[k][0][1], \
-                vecs[k][1][0], vecs[k][1][1])
-    return vecs
-
-@matrify
-def type1_ray(n,m):
-    M = np.array(um.E(n,m))
-    M[m,:] = M[:,m] = 0
-    return M
-
-@matrify
-def ray_D(n, m):
-    return np.diag([1]*m + [0] + [1]*(n-m-1))
+def block_structure(M):
+    "Diagonal block structure of nxn symmetric matrix M."
+    lst = []
+    n = M.ncols()
+    i = 0
+    while i < n:
+        subs = [M.submatrix(i,i,j,j) for j in range(1, n-i+1)]
+        block_size = [S for S in subs if S.is_zero()][-1].ncols()
+        lst.append(block_size)
+        i += block_size
+    return tuple(lst)
 
