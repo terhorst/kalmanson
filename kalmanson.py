@@ -7,7 +7,7 @@ import numpy as np
 from itertools import izip_longest, combinations, ifilter, imap
 import itertools as it
 from functools import partial
-from sage.all import matrix, binomial, zero_matrix, combinations_iterator
+from sage.all import matrix, binomial, zero_matrix, combinations_iterator, vector
 from memoized import memoized
 import utility_matrices as um
 
@@ -260,10 +260,16 @@ def kalmanson_polyhedra(n):
     return [Polyhedron(rays=map(upper_triangle, map(partial(permute_matrix, g), R))) \
                 for g in SymmetricGroup(n)]
 
+def make_cone(p):
+    from kalmanson import upper_triangle
+    return Cone(map(upper_triangle, p), ZZ**binomial(p[0].ncols(), 2))
+
 def kalmanson_cones(n):
-    polys = kalmanson_polyhedra(n)
-    cones = [Cone(p, ZZ**(binomial(n, 2))) for p in polys]
-    return cones
+    R = rays(n)
+    ray_sets = Set([Set([permute_matrix(g,M) for M in R]) for g in SymmetricGroup(n)])
+    p_iter = pyprocessing(8)
+    P = parallel(p_iter=p_iter)
+    return [ret for ((poly,kwd),ret) in P(make_cone)(ray_sets.list())]
 
 def kalmanson_fan(n):
     return Fan(Set(kalmanson_cones(n)))
