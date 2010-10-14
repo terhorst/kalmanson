@@ -213,14 +213,11 @@ def orbit(M):
     "Return the orbit of the nxn symmetric matrix M."
     n = M.ncols()
     Sn = SymmetricGroup(n)
-    d = {}
-    for g in Sn:
-        mat = permute_matrix(g, M)
-        try:
-            d[mat].append(g)
-        except KeyError:
-            d[mat] = [g]
-    return d
+    return Set([permute_matrix(g, M) for g in Sn])
+
+def orbit_of_rays(n):
+    "Return the orbit of all rays for nxn Kalmanson cones."
+    return reduce(lambda x,y: x.union(y), map(orbit, rays(n)))
 
 def stabilizer(M):
     "Return the stabilizer subgroup of the nxn symmetric matrix M."
@@ -338,3 +335,8 @@ def block_structure(M):
         i += block_size
     return tuple(lst)
 
+def show_ray(R):
+    G = Graph(R)
+    splits = np.split(np.arange(R.ncols(), dtype=int), np.cumsum(block_structure(R)))
+    partitions = [list(sp) for sp in splits if list(sp)]
+    return G.show(partition=partitions, layout="circular")
