@@ -7,7 +7,7 @@ import numpy as np
 from itertools import izip_longest, combinations, ifilter, imap
 import itertools as it
 from functools import partial
-from sage.all import matrix, binomial, zero_matrix, combinations_iterator, vector
+from sage.all import matrix, binomial, zero_matrix, combinations_iterator, vector, permutation_action
 from memoized import memoized
 import utility_matrices as um
 
@@ -211,13 +211,17 @@ def permute_matrix(g, M):
 
 def orbit(M):
     "Return the orbit of the nxn symmetric matrix M."
+    from kalmanson import permute_matrix
     n = M.ncols()
     Sn = SymmetricGroup(n)
     return Set([permute_matrix(g, M) for g in Sn])
 
 def orbit_of_rays(n):
     "Return the orbit of all rays for nxn Kalmanson cones."
-    return reduce(lambda x,y: x.union(y), map(orbit, rays(n)))
+    p_iter = sage.parallel.use_fork.p_iter_fork(sage.parallel.ncpus.ncpus() * 2,30)
+    P = parallel(p_iter=p_iter)
+    orbits = [ret for ((poly,kwd),ret) in P(orbit)(rays(n))]
+    return reduce(lambda x,y: x.union(y), orbits)
 
 def stabilizer(M):
     "Return the stabilizer subgroup of the nxn symmetric matrix M."
