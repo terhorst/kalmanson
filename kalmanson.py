@@ -14,6 +14,13 @@ import utility_matrices as um
 np.set_printoptions(linewidth=100)
 
 # Utility functions
+def collapse_list(lst):
+    "Turn a list of numbers into a dict counting how many times each number occurs."
+    ret = {}
+    for num in lst:
+        ret[num] = ret.get(num,0) + 1
+    return ret
+
 @matrify
 def conjugate(D,M):
     "Return matrix conjugation (D^T)*M*D."
@@ -77,6 +84,11 @@ def triu_indices(n, d=0):
             r.append(i)
             c.append(j)
     return list(map(np.array, (r,c)))
+
+def upper_triangle(M):
+    "Return the upper triangle of M as a vector."
+    M = np.array(M)
+    return vector(list(M[triu_indices(M.shape[0], 1)]))
 
 # Real code
 class KalmansonSystem:
@@ -191,57 +203,29 @@ def _check_ind(n):
             M.append(A(n,i,j))
     return(M)
 
-def make_basis(n, flat=True):
-    triu = triu_indices(n)
-    E_b = []
-    E_b += [E(n,i+1) for i in range(n)]
-    E_b += [E(n,i+1,i+1) for i in range(n)]
-    if flat:
-        return matrix(np.vstack([A.flatten() for A in E_b]))
-    else:
-        return E_b
+def permute_matrix(g, M):
+    mat = permutation_action(g, permutation_action(g, M).transpose()).transpose()
+    mat.set_immutable()
+    return mat
 
-def make_Aflat(n):
-    M = [A(n,i) for i in range(2, n-1)] 
-    for i in range(1, n-2):
-        for j in range(i+2, n):
-            M.append(A(n,i,j))
-    triu = triu_indices(n,1)
-    M = [T[triu].flatten() for T in M]
-    return matrix(np.vstack(M))
+def orbit(M):
+    "Return the orbit of the nxn symmetric matrix M."
+    n = M.ncols()
+    Sn = SymmetricGroup(n)
+    d = {}
+    for g in Sn:
+        mat = permute_matrix(g, M)
+        try:
+            d[mat].append(g)
+        except KeyError:
+            d[mat] = [g]
+    return d
 
-def reformat_matrix(M, leading="0"):
-    return re.sub('\\[\s*([^\\]]*)\\]', '%s \\1' % leading, M.str())
-
-def polymake_kalmanson(n, ineq=False, fn=None):
-    txt = ""
-    if ineq:
-        M = kalmanson_matrix(n,1)
-        ortho = matrix(M).right_kernel().basis_matrix()
-#        M = matrix(np.vstack([M, ortho, -ortho]))
-        txt = "INEQUALITIES\n%s\nEQUATIONS\n%s"
-        args = map(reformat_matrix, [matrix(M), ortho])
-        out = txt % tuple(args)
-    else:
-        M = make_Aflat(n)
-        txt = "POINTS\n%s"
-
-    if fn:
-        with open(fn, 'w+') as f:
-            f.write(out)
-    else:
-        print out
-
-def cdd_kalmanson(n):
-    M = kalmanson_system(n,1)
-    ortho = matrix(M).right_kernel().basis_matrix()
-    M = np.vstack([-M, ortho, -ortho])
-    txt = """H-representation
-begin
-%i %i integer
-%s
-end"""
-    print txt % (M.shape[0], M.shape[1] + 1, reformat_matrix(matrix(M)))
+def stabilizer(M):
+    "Return the stabilizer subgroup of the nxn symmetric matrix M."
+    n = M.ncols()
+    Sn = SymmetricGroup(n)
+    return filter(lambda g: permute_matrix(g, M)==M, Sn)
 
 def permutation_vector(g):
     """
@@ -272,16 +256,9 @@ def kalmanson_polyhedra(n):
     """
     Return a list of all Kalmanson polyhedra for n taxa (including reorderings.)
     """
-    # return [kalmanson_polyhedron(permuted_kalmanson_matrix(n, p)) \
-    # for p in SymmetricGroup(n)]
-    M = kalmanson_matrix(n)
-    mats = []
-    for perm in SymmetricGroup(n):
-        perm_vec = permutation_vector(perm)
-        mats.append(matrix(np.vstack([np.array(r)[perm_vec] for r in M.rows()])))
-    return map(kalmanson_polyhedron, mats)
-    # return [kalmanson_polyhedron(m) for p in kalmanson_polyhedron(mats)]
-    # return kalmanson_polyhedron(mats)
+    R = rays(n)
+    return [Polyhedron(rays=map(upper_triangle, map(partial(permute_matrix, g), R))) \
+                for g in SymmetricGroup(n)]
 
 def kalmanson_cones(n):
     polys = kalmanson_polyhedra(n)
@@ -326,6 +303,34 @@ def positive_lineality_space(n):
     ieq = zero_matrix(c,1).augment(identity_matrix(c)).rows()
     return Polyhedron(eqns=eq, ieqs=ieq)
 
+def rays(n):
+    "The rays associated with the standard Kalmanson inequalities on n taxa."
+    ret = []
+    for i in range(2, n-1):
+        ret.append(um.V(n, i))
+
+    for i in range(1, n-2):
+        for j in range(i+2, n):
+            ret.append(um.V(n,i,j))
+
+    return ret
+
+def textual_rays(n):
+    tsm = textual_symmetric_matrix(5)
+    return map(list, [tsm[np.nonzero(np.triu(r,1))] for r in rays(n)])
+
+def fixing_except(notfixed):
+    n = notfixed.ncols()
+    R = rays(n)
+    nf_orbit = orbit(notfixed)
+    dontfix = reduce(lambda x,y: x.union(y), [Set(nf_orbit[k]) for k in nf_orbit.keys() \
+            if k not in R])
+    R.remove(notfixed)
+    orbits = dict(zip(R, map(orbit, R)))
+    dofix = [reduce(lambda x,y: x.union(y), [Set(orbits[r][k]) for k in orbits[r].keys() \
+            if k in R]) for r in orbits.keys()]
+    fixers = reduce(lambda x,y: x.intersection(y), dofix)
+    
 def ray_matrices(n):
     A,B = positive_lineality_space(n),std_kalmanson_polyhedron(n)
     return map(matrix, [m.rays() for m in (A,B)]) 
@@ -428,24 +433,6 @@ def pretty_print_patterns(n):
         print "%i\t%s\t%s\t%s\t%s" % (k, vecs[k][0][0], vecs[k][0][1], \
                 vecs[k][1][0], vecs[k][1][1])
     return vecs
-
-def ray_basis_from_paper(n):
-    return {'i': [um.V(n, i+1) for i in range(2,n-1)],
-            'ij': reduce(operator.add, \
-                [[um.V(n, i, j) for j in range(i+2, n)] for i in range(1, n-2)])}
-
-def textual_ray_basis(n):
-    rb = ray_basis_from_paper(n)
-    tm = textual_symmetric_matrix(n)
-    vecs = dict([(k,[tm[np.nonzero(b)] for b in basis]) for (k,basis) in rb.iteritems()])
-    return vecs
-
-def ray_basis_pp(vecs, do_sort=True):
-    if do_sort:
-        print "\n".join(sorted(map(str, vecs)))
-            #lambda a,b: cmp(a,b) if len(a)==len(b) else cmp(len(a),len(b))))
-    else:
-        print "\n".join(map(str,vecs))
 
 @matrify
 def type1_ray(n,m):

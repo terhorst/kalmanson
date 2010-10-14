@@ -8,3 +8,12 @@ def matrify(f):
         mat.set_immutable()
         return mat
     return wrapper
+
+def symmetrize(f):
+    @wraps(f)
+    def wrapper(*args):
+        mat = f(*args)
+        mat += mat.transpose()
+        mat.set_immutable()
+        return mat
+    return wrapper
