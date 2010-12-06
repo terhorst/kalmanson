@@ -513,7 +513,7 @@ def triangle_number_gen(a,b,n,sought = None):
 def show_partition_types(n,k):
     G = []
     Cn = graphs.CycleGraph(n)
-    for edges in combinations_iterator(ifilter(lambda (x,y): abs(x-y) % (n-1) > 1, combinations_iterator(range(n), 2)), k):
+    for edges in combinations_iterator(filter(lambda (x,y): abs(x-y) % (n-1) > 1, combinations_iterator(range(n), 2)), k):
         g = Cn.copy()
         g.add_edges(edges)
         G.append(g)
