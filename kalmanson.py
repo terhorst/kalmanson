@@ -4,7 +4,7 @@ import sys, os, re
 from multiprocessing_jth import pyprocessing
 from matrify import matrify
 import numpy as np
-from itertools import izip_longest, combinations, ifilter, imap
+from itertools import izip_longest, combinations, ifilter, imap, product
 import itertools as it
 from functools import partial
 from sage.all import matrix, binomial, zero_matrix, combinations_iterator, vector, permutation_action
@@ -142,6 +142,7 @@ class KalmansonSystem:
         descs = [str(vars * row) + " >= 0" for row in self._ieqs]
         return "A Kalmanson system of inequalities:\n%s" % "\n".join(descs)
 
+
 def alt_kalmanson_matrix(n):
     r,c = triu_indices(n, 1)
     ncols = len(r)
@@ -209,19 +210,25 @@ def permute_matrix(g, M):
     mat.set_immutable()
     return mat
 
-def orbit(M):
+def orbit(n, M):
     "Return the orbit of the nxn symmetric matrix M."
-    from kalmanson import permute_matrix
-    n = M.ncols()
     Sn = SymmetricGroup(n)
-    return Set([permute_matrix(g, M) for g in Sn])
+    return Set([permute_action(g, M) for g in Sn])
 
-def orbit_of_rays(n):
-    "Return the orbit of all rays for nxn Kalmanson cones."
-    p_iter = sage.parallel.use_fork.p_iter_fork(sage.parallel.ncpus.ncpus() * 2,30)
-    P = parallel(p_iter=p_iter)
-    orbits = [ret for ((poly,kwd),ret) in P(orbit)(rays(n))]
-    return reduce(lambda x,y: x.union(y), orbits)
+def standardize_elt(v):
+    v = vector(v)
+    return v if v[0]==1 else v*-1
+
+def orbit_by_element(g,v):
+    v = tuple(v)
+    initial = copy(v)
+    v = tuple(standardize_elt(g(v)))
+    orb = []
+    while initial != v:
+        orb.append(copy(v))
+        v = tuple(standardize_elt(g(v)))
+    orb.append(copy(v))
+    return Set(orb)
 
 def stabilizer(M):
     "Return the stabilizer subgroup of the nxn symmetric matrix M."
@@ -256,7 +263,8 @@ def set_of_kalmanson_matrices(n):
 
 def kalmanson_polyhedra(n):
     """
-    Return a list of all Kalmanson polyhedra for n taxa (including reorderings.)
+    Return a list of all Kalmanson polyhedra for n taxa (including
+    reorderings.)
     """
     R = rays(n)
     return [Polyhedron(rays=map(upper_triangle, map(partial(permute_matrix, g), R))) \
@@ -267,11 +275,17 @@ def make_cone(p):
     return Cone(map(upper_triangle, p), ZZ**binomial(p[0].ncols(), 2))
 
 def kalmanson_cones(n):
-    R = rays(n)
-    ray_sets = Set([Set([permute_matrix(g,M) for M in R]) for g in SymmetricGroup(n)])
-    p_iter = sage.parallel.use_fork.p_iter_fork(sage.parallel.ncpus.ncpus() * 2,30)
-    P = parallel(p_iter=p_iter)
-    return [ret for ((poly,kwd),ret) in P(make_cone)(ray_sets.list())]
+    desc = "kalmanson_cones_%i" % n
+    try:
+        return db(desc)
+    except IOError:
+        R = rays(n)
+        ray_sets = Set([Set([permute_matrix(g,M) for M in R]) for g in SymmetricGroup(n)])
+        p_iter = sage.parallel.use_fork.p_iter_fork(sage.parallel.ncpus.ncpus() * 2,30)
+        P = parallel(p_iter=p_iter)
+        cones = [ret for ((poly,kwd),ret) in P(make_cone)(ray_sets.list())]
+        db_save(Set(cones), desc)
+        return cones
 
 def kalmanson_fan(n):
     return Fan(Set(kalmanson_cones(n)))
@@ -320,8 +334,14 @@ def rays(n):
     for i in range(1, n-2):
         for j in range(i+2, n):
             ret.append(um.V(n,i,j))
-
+    
     return ret
+
+def all_rays(n, Cn=None):
+    if not Cn:
+        Cn = kalmanson_cones(n)
+    return Set([Set([tuple(ray_sign_vector(symmetric_matrix(n, r))) for r in cone.rays()]) \
+            for cone in Cn])
 
 def textual_rays(n):
     tsm = textual_symmetric_matrix(5)
@@ -339,8 +359,222 @@ def block_structure(M):
         i += block_size
     return tuple(lst)
 
-def show_ray(R):
+def ray_sign_pattern(R):
+    d = {-1:"-", 1:"+"}
+    sv = ray_sign_vector(R)
+    return "".join(map(d.get, sv))
+
+def ray_sign_vector(R):
+    def SignAlternator():
+        i = -1
+        while True:
+            i *= -1
+            yield i
+    sa = SignAlternator()
+    v = vector([s for s,i in zip(sa, block_structure(R)) for k in range(i) ])
+    v.set_immutable()
+    return v
+
+def test_permutation(g,R):
+    Rp = permute_matrix(g,R)
+    pat = map(ray_sign_pattern, [R,Rp])
+    vec = np.array(permutation_action(g, ray_sign_vector(R)))
+    if vec[0]==-1:
+        vec *= -1
+    pred = vector(list(vec))
+    d = {-1:"-", 1:"+"}
+    pred = "".join(map(d.get, pred))
+    #print R,"\n\n",Rp
+    #print "p0: %s\tp': %s\tp_pred: %s" % (pat[0], pat[1], pred)
+    assert pred==pat[1]
+
+def cone_sign_matrix(n, C):
+    rays = [symmetric_matrix(n, r) for r in C.rays()]
+    return matrix([ray_sign_vector(r) for r in rays])
+
+def ray_graph(R):
     G = Graph(R)
-    splits = np.split(np.arange(R.ncols(), dtype=int), np.cumsum(block_structure(R)))
-    partitions = [list(sp) for sp in splits if list(sp)]
-    return G.show(partition=partitions, layout="circular")
+    n = R.ncols()
+    # splits = np.split(np.arange(R.ncols(), dtype=int), np.cumsum(block_structure(R)))
+    # partitions = [list(sp) for sp in splits if list(sp)]
+    pluses = tuple(i for i,c in enumerate(ray_sign_vector(R)) if c==1)
+    partitions = [pluses, tuple(i for i in range(n) if i not in pluses)]
+    return G,partitions
+
+def ray_split(R):
+    sv = ray_sign_vector(R)
+    pluses = tuple(i for i,c in enumerate(sv) if c==1)
+    partition = [pluses, tuple(i for i in range(len(sv)) if i not in pluses)]
+    return partition
+
+def permutations_which_fix(n,m):
+    Rn = Set(rays(n))
+    return filter(lambda g: Set(permute_matrix(g,M) for M in Rn).intersection(Rn).cardinality() == m,
+            SymmetricGroup(n))
+            
+def pairwise_compatible(sp_A, sp_B):
+    "True if the two split sets sp_A and sp_B are pairwise compatible."
+    return any(Set(A).intersection(Set(B)).cardinality() == 0 \
+            for A,B in it.product(sp_A, sp_B))
+
+def compatibility_degree(splits):
+    "Check that this list of splits is pairwise compatible."
+    return sum(1 for pair in it.combinations(splits,2) \
+            if not any(Set(A).intersection(Set(B)).cardinality() == 0
+                for A,B in it.product(*pair)))
+
+def cone_splits(C,n):
+    return [G[1] for G in make_cone_graph(C,n)]
+
+def make_cone_graph(C,n):
+    graphpairs = [ray_graph(symmetric_matrix(n,r)) for r in C.rays()]
+    # return [G.plot(partition=part, layout="circular") for G,part in graphpairs]
+    return graphpairs
+
+def ray_magic(C,n):
+    ray_sets = [Set([ray_sign_vector(symmetric_matrix(n,r)) for r in cone]) for cone in C] 
+    canonical = ray_sets[0]
+    d = {}
+    for g in SymmetricGroup(n):
+        permute = Set([tuple(permutation_action(g, v)) for v in canonical])
+        d[permute] = d.get(permute, []) + [g]
+    return d
+
+def ray_matrices(cone,n):
+    return [symmetric_matrix(n, r) for r in cone.rays()]
+
+def all_ray_matrices(n):
+    Cn = kalmanson_cones(n)
+    return uniq(M for cone in Cn for M in ray_matrices(cone, n))
+
+def graph_rays_cones(C):
+    n = C[0].lattice_dim() / 2
+    Rn = Set([r for g in SymmetricGroup(n) for v in map(ray_sign_vector, rays(n))
+            for r in orbit_by_element(g,v)])
+    d = {-1: "-", 1: "+"}
+    signer = lambda v: "".join(map(d.get, v))
+    descs = Set(map(signer, Rn))
+    part = [descs, []]
+    G = Graph()
+    G.add_vertices(descs)
+    i = 0
+    for c in C:
+        i += 1
+        desc = "Cone %i" % i 
+        part[1].append(desc)
+        G.add_vertex(desc)
+        for r in c.rays():
+            sv = ray_sign_pattern(symmetric_matrix(n, r)) 
+            G.add_edge(sv, desc)
+    
+    return G,part
+
+def ray_to_splits(n, ray):
+    mat = symmetric_matrix(n, ray)
+    vec = ray_sign_vector(mat)
+    ns = range(1,n+1)
+    pos = Set(ind for s,ind in zip(vec, ns) if s==1)
+    neg = Set(ns) - pos
+    return pos if 1 in pos else neg
+#    if pos.cardinality() < neg.cardinality():
+#         return pos
+#     elif pos.cardinality() == neg.cardinality():
+#         return pos if sorted(pos)[0] < sorted(neg)[0] else neg
+#     else:
+#         return neg
+
+def non_trivial_splits(n):
+    rng = Set(range(1,n+1))
+    splits = Set([Set(tuple(s)) for s in powerset(rng) if len(s)>1 and len(s)<n-1])
+    splits = Set([x if x.cardinality() <= floor(n/2) else rng - x 
+        for x in splits])
+    splits = Set([rng - x if x.cardinality() == n/2 and min(x) > min(rng - x) else x
+        for x in splits])
+    return splits
+
+def invalid_splits(n,k,faces):
+    return Set(map(Set, combinations(non_trivial_splits(n),k))) - \
+            Set([Set([ray_to_splits(n, r) for r in f.rays()]) for f in faces])
+
+
+def splits1():
+    lst = []
+    for x in range(2, 7):
+        for y in combinations(Set(range(2,7)) - Set([x]), 3):
+            A = Set(map(Set,product([x], y)))
+            for el in A:
+                Ap = A - Set([el])
+                lst.append(Set([el.union(Set([1]))]).union(Ap))
+    return(lst)
+
+
+def splits2():
+    lst = []
+    for y in combinations(range(2,7),3):
+        for z in Set(range(2,7)) - Set(y):
+            A = Set([Set([1,k]) for k in y])
+            for el in A:
+                Ap = A - Set([el])
+                lst.append(Set([el.union(Set([z]))]).union(Ap))
+    return lst
+
+def splits3():
+    lst = []
+    for y in combinations(range(2,7),3):
+        A = Set([Set(c) for c in combinations(y,2)])
+        for el in A:
+            Ap = A - Set([el])
+            lst.append(Set([el.union(Set([1]))]).union(Ap))
+    return lst
+
+def splits4():
+    lst = []
+    for y in combinations(range(2,7),2):
+        y = [1]+y
+        A = Set([Set(c) for c in combinations(y,2)])
+        for el in A:
+            Ap = A - Set([el])
+            lst.append(Set([el.union(Set([1]))]).union(Ap))
+    return lst
+
+def splits5():
+    lst = []
+    for x in range(2,7):
+        for y in combinations(Set(range(2,7)) - Set([x]), 3):
+            A = Set(map(Set, product([x], y)))
+            for el in A:
+                Ap = map()
+                lst.append([1,2])
+
+
+def triangle_number_gen(a,b,n,sought = None):
+    rows = [[1],[a,b]]
+    for i in range(n):
+        row = rows[i+1]
+        newrow = [a]
+        for j in range(len(row)-1):
+            x = row[j] + row[j+1]
+            if sought and sought==x:
+                raise Exception("(%i, %i)" % (i,j))
+            newrow.append(row[j] + row[j+1])
+        newrow.append(b)
+        rows.append(newrow)
+    return rows
+
+
+def show_partition_types(n,k):
+    G = []
+    Cn = graphs.CycleGraph(n)
+    for edges in combinations(ifilter(lambda (x,y): abs(x-y) % (n-1) > 1, combinations(range(n), 2)), k):
+        g = Cn.copy()
+        g.add_edges(edges)
+        G.append(g)
+    H = []
+    for g in G:
+        if any(g.is_isomorphic(h) for h in H):
+            pass
+        else:
+            H.append(g)
+    return H
+    
+    
