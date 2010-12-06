@@ -496,57 +496,6 @@ def invalid_splits(n,k,faces):
     return Set(map(Set, combinations(non_trivial_splits(n),k))) - \
             Set([Set([ray_to_splits(n, r) for r in f.rays()]) for f in faces])
 
-
-def splits1():
-    lst = []
-    for x in range(2, 7):
-        for y in combinations(Set(range(2,7)) - Set([x]), 3):
-            A = Set(map(Set,product([x], y)))
-            for el in A:
-                Ap = A - Set([el])
-                lst.append(Set([el.union(Set([1]))]).union(Ap))
-    return(lst)
-
-
-def splits2():
-    lst = []
-    for y in combinations(range(2,7),3):
-        for z in Set(range(2,7)) - Set(y):
-            A = Set([Set([1,k]) for k in y])
-            for el in A:
-                Ap = A - Set([el])
-                lst.append(Set([el.union(Set([z]))]).union(Ap))
-    return lst
-
-def splits3():
-    lst = []
-    for y in combinations(range(2,7),3):
-        A = Set([Set(c) for c in combinations(y,2)])
-        for el in A:
-            Ap = A - Set([el])
-            lst.append(Set([el.union(Set([1]))]).union(Ap))
-    return lst
-
-def splits4():
-    lst = []
-    for y in combinations(range(2,7),2):
-        y = [1]+y
-        A = Set([Set(c) for c in combinations(y,2)])
-        for el in A:
-            Ap = A - Set([el])
-            lst.append(Set([el.union(Set([1]))]).union(Ap))
-    return lst
-
-def splits5():
-    lst = []
-    for x in range(2,7):
-        for y in combinations(Set(range(2,7)) - Set([x]), 3):
-            A = Set(map(Set, product([x], y)))
-            for el in A:
-                Ap = map()
-                lst.append([1,2])
-
-
 def triangle_number_gen(a,b,n,sought = None):
     rows = [[1],[a,b]]
     for i in range(n):
@@ -561,11 +510,10 @@ def triangle_number_gen(a,b,n,sought = None):
         rows.append(newrow)
     return rows
 
-
 def show_partition_types(n,k):
     G = []
     Cn = graphs.CycleGraph(n)
-    for edges in combinations(ifilter(lambda (x,y): abs(x-y) % (n-1) > 1, combinations(range(n), 2)), k):
+    for edges in combinations_iterator(ifilter(lambda (x,y): abs(x-y) % (n-1) > 1, combinations_iterator(range(n), 2)), k):
         g = Cn.copy()
         g.add_edges(edges)
         G.append(g)
@@ -576,5 +524,3 @@ def show_partition_types(n,k):
         else:
             H.append(g)
     return H
-    
-    
