@@ -288,7 +288,13 @@ def kalmanson_cones(n):
         return cones
 
 def kalmanson_fan(n):
-    return Fan(Set(kalmanson_cones(n)))
+    fn = "kalmanson_fan_%i" % n
+    try:
+        return db(fn)
+    except IOError:
+        f = Fan(Set(kalmanson_cones(n)))
+        f.db(fn)
+        return f
 
 # @parallel(ncpus=2, p_iter="multiprocessing")
 def std_kalmanson_polyhedron(n, lineality=False):
@@ -476,17 +482,17 @@ def ray_to_splits(n, ray):
     pos = Set(ind for s,ind in zip(vec, ns) if s==1)
     neg = Set(ns) - pos
     return pos if 1 in pos else neg
-#    if pos.cardinality() < neg.cardinality():
-#         return pos
-#     elif pos.cardinality() == neg.cardinality():
-#         return pos if sorted(pos)[0] < sorted(neg)[0] else neg
-#     else:
-#         return neg
+    if pos.cardinality() < neg.cardinality():
+         return pos
+    elif pos.cardinality() == neg.cardinality():
+         return pos if sorted(pos)[0] < sorted(neg)[0] else neg
+    else:
+         return neg
 
 def non_trivial_splits(n):
     rng = Set(range(1,n+1))
     splits = Set([Set(tuple(s)) for s in powerset(rng) if len(s)>1 and len(s)<n-1])
-    splits = Set([x if x.cardinality() <= floor(n/2) else rng - x 
+    splits = Set([x if x.cardinality() <= floor(n/2) else rng - x \
         for x in splits])
     splits = Set([rng - x if x.cardinality() == n/2 and min(x) > min(rng - x) else x
         for x in splits])
@@ -495,20 +501,6 @@ def non_trivial_splits(n):
 def invalid_splits(n,k,faces):
     return Set(map(Set, combinations(non_trivial_splits(n),k))) - \
             Set([Set([ray_to_splits(n, r) for r in f.rays()]) for f in faces])
-
-def triangle_number_gen(a,b,n,sought = None):
-    rows = [[1],[a,b]]
-    for i in range(n):
-        row = rows[i+1]
-        newrow = [a]
-        for j in range(len(row)-1):
-            x = row[j] + row[j+1]
-            if sought and sought==x:
-                raise Exception("(%i, %i)" % (i,j))
-            newrow.append(row[j] + row[j+1])
-        newrow.append(b)
-        rows.append(newrow)
-    return rows
 
 def show_partition_types(n,k):
     G = []
@@ -519,8 +511,63 @@ def show_partition_types(n,k):
         G.append(g)
     H = []
     for g in G:
-        if any(g.is_isomorphic(h) for h in H):
-            pass
-        else:
-            H.append(g)
+        match = False
+        for lst in H:
+            if g.is_isomorphic(lst[0]):
+                match = True
+                lst[1] += 1
+                break
+        if not match:
+            H.append([g,1])
     return H
+
+def f_vector(fan):
+    return map(len, fan.cone_lattice().level_sets())
+
+def h_vector(fan):
+    f = f_vector(fan)[:-1]
+    d = len(f) - 1
+    return [sum([(-1)**(k-j) * binomial(d-j, k-j) * f[j] for j in range(k+1)]) for k in range(d)]
+
+def number_simplex(n, rays, sought):
+    # General recurrence relation for multinomial:
+    # multi(k1,...,kn) = multi(k1-1,k2,...,kn) + multi(k1,k2-1,...,kn) + ... + multi(k1,...,kn-1)
+
+    dim = len(rays)
+
+    def level_set(c):
+        if len(c) == dim:
+            n = _simplicial_number(c,rays)
+            if n==sought:
+                print Exception("Found %i: f(%s,%s)" % (sought, c, rays))
+            return n
+        else:
+            subsimplices = [(c[:-1] + (c[-1]-i,) + (i,)) for i in range(c[-1]+1)]
+            return map(level_set, subsimplices)
+
+    return [level_set((i,)) for i in range(n)]
+
+@memoized
+def _simplicial_number(coords,rays):
+    z = list(np.nonzero(coords)[0])
+    if len(z) == 0:
+        return 1
+    elif len(z) == 1:
+        return rays[z[0]]
+    elif len(z) < len(rays):
+        z = coords.index(0)
+        cp = coords[:z] + coords[z+1:]
+        rp = rays[:z] + rays[z+1:]
+        return f(cp, rp)
+    else:
+        dim = len(coords)
+        shift_vec = np.array([-1] + [0]*(dim-1))
+        return sum(f(tuple(np.roll(shift_vec, i) + coords),rays) for i in range(dim))
+
+def enumerate_split_types(n,k):
+    faces = kalmanson_fan(n)(k)
+    sp = Set([Set([ray_to_splits(n, r) for r in f.rays()]) for f in faces])
+    tups = [tuple(sorted(map(len, x))) for x in sp]
+    return dict((u,tups.count(u)) for u in uniq(tups))
+    
+
