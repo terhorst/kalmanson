@@ -498,9 +498,6 @@ def non_trivial_splits(n):
         for x in splits])
     return splits
 
-def invalid_splits(n,k,faces):
-    return Set(map(Set, combinations(non_trivial_splits(n),k))) - \
-            Set([Set([ray_to_splits(n, r) for r in f.rays()]) for f in faces])
 
 def show_partition_types(n,k):
     G = []
@@ -529,7 +526,7 @@ def h_vector(fan):
     d = len(f) - 1
     return [sum([(-1)**(k-j) * binomial(d-j, k-j) * f[j] for j in range(k+1)]) for k in range(d)]
 
-def number_simplex(n, rays, sought):
+def number_simplex(n, rays, sought=None):
     # General recurrence relation for multinomial:
     # multi(k1,...,kn) = multi(k1-1,k2,...,kn) + multi(k1,k2-1,...,kn) + ... + multi(k1,...,kn-1)
 
@@ -564,10 +561,26 @@ def _simplicial_number(coords,rays):
         shift_vec = np.array([-1] + [0]*(dim-1))
         return sum(f(tuple(np.roll(shift_vec, i) + coords),rays) for i in range(dim))
 
-def enumerate_split_types(n,k):
+def enumerate_splits(n,k,invalid=False):
+    f = invalid_splits if invalid_splits else valid_splits
+    s = f(n,k)
+    tups = [tuple(sorted(map(len, x))) for x in s]
+    return dict((u,tups.count(u)) for u in uniq(tups))
+
+def valid_splits(n,k):
     faces = kalmanson_fan(n)(k)
     sp = Set([Set([ray_to_splits(n, r) for r in f.rays()]) for f in faces])
-    tups = [tuple(sorted(map(len, x))) for x in sp]
-    return dict((u,tups.count(u)) for u in uniq(tups))
-    
+    return sp
 
+def invalid_splits(n,k):
+    faces = kalmanson_fan(n)(k)
+    return Set(map(Set, combinations(non_trivial_splits(n),k))) - \
+            valid_splits(n,k)
+
+def dimension_of_span(n, k):
+    dim_counts = {}
+    for rays in combinations_iterator(all_ray_matrices(n), k):
+        kers = [r.image() for r in rays]
+        dim = reduce(lambda x,y: x.intersection(y), kers).dimension()
+        dim_counts[dim] = dim_counts.get(dim,0) + 1
+    return dim_counts
