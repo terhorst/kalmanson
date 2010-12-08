@@ -584,3 +584,19 @@ def dimension_of_span(n, k):
         dim = reduce(lambda x,y: x.intersection(y), kers).dimension()
         dim_counts[dim] = dim_counts.get(dim,0) + 1
     return dim_counts
+
+def count_stuff(fan):
+    cones = fan.cones()
+    d = len(cones)
+
+    for i in range(1,d):
+        c_i = cones[i]
+        print "Dimension %i (%i cones):" % (i, len(c_i))
+        for j in range(i, d):
+            dims = {}
+            for c in c_i:
+                rays = c.rays()
+                k = sum([1 for cone in cones[j] if all(ray in cone.rays() for ray in rays)])
+                dims[k] = dims.get(k,0) + 1
+            print "\t%i-faces: %s" % \
+                    (j, ", ".join("%i are in %i" % (v,k) for k,v in dims.iteritems()))
