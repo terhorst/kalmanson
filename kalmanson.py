@@ -509,22 +509,23 @@ def show_partition_types(n,k):
     H = []
     for g in G:
         match = False
-        for lst in H:
-            if g.is_isomorphic(lst[0]):
+        for j in H:
+            if g.is_isomorphic(j):
                 match = True
-                lst[1] += 1
                 break
         if not match:
-            H.append([g,1])
+            H.append(g)
     return H
 
 def f_vector(fan):
-    return map(len, fan.cone_lattice().level_sets())
+    return map(len, fan.cone_lattice().level_sets())[:-1]
 
 def h_vector(fan):
-    f = f_vector(fan)[:-1]
-    d = len(f) - 1
-    return [sum([(-1)**(k-j) * binomial(d-j, k-j) * f[j] for j in range(k+1)]) for k in range(d)]
+    f = f_vector(fan)
+    d = len(f)
+    x = var('x')
+    poly = sum([f[i]*(x-1)**(d-i) for i in range(d)])
+    return [a for a,b in reversed(poly.expand().coefficients())]
 
 def number_simplex(n, rays, sought=None):
     # General recurrence relation for multinomial:
@@ -588,15 +589,23 @@ def dimension_of_span(n, k):
 def count_stuff(fan):
     cones = fan.cones()
     d = len(cones)
-
     for i in range(1,d):
         c_i = cones[i]
         print "Dimension %i (%i cones):" % (i, len(c_i))
-        for j in range(i, d):
-            dims = {}
-            for c in c_i:
-                rays = c.rays()
-                k = sum([1 for cone in cones[j] if all(ray in cone.rays() for ray in rays)])
-                dims[k] = dims.get(k,0) + 1
-            print "\t%i-faces: %s" % \
-                    (j, ", ".join("%i are in %i" % (v,k) for k,v in dims.iteritems()))
+        dims = {}
+        for c in c_i:
+            rays = c.rays()
+            ind = tuple(sum(1 for cone in cones[j] if all(ray in cone.rays() for ray in rays)) \
+                    for j in range(i, d))
+            dims[ind] = dims.get(ind,0) + 1
+        print "\n".join("\t%s: %i" % (k,v) for k,v in dims.iteritems())
+
+def cones_fun(n, k):
+    fan = kalmanson_fan(n)
+    rays = [c.rays()[0] for c in fan(1)]
+    cones = Set(fan(k))
+    for r in combinations(rays, k):
+        c = Cone(r) 
+        if c in cones:
+            print prod(symmetric_matrix(n, ray) for ray in r).change_ring(GF(2))
+            print ""
