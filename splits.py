@@ -1,7 +1,7 @@
-from sage.all import Set, combinations_iterator
+from sage.all import Set, combinations_iterator, parallel, binomial
 import itertools as it
 
-class Split:
+class Split(object):
     def __init__(self, X, A):
         A = Set(A)
         X = Set(X)
@@ -21,6 +21,13 @@ class Split:
     def __hash__(self):
         return self.blocks().__hash__()
 
+    def __getstate__(self):
+        return {'X': self.X(), 'A': self.A()}
+
+    def __setstate__(self, state):
+        self._X = state['X']
+        self._A = state['A']
+
     def B(self):
         return self.X() - self.A()
 
@@ -34,7 +41,7 @@ class Split:
     def blocks(self):
         return Set([self.A(), self.B()])
 
-class SplitSystem:
+class SplitSystem(object):
     def __init__(self,splits=[]):
         self._splits = Set(splits)
 
@@ -73,3 +80,25 @@ def all_splits(X):
     X = Set(X)
     return Set(Split(X,b) for i in range(2, X.cardinality() - 1) \
             for b in combinations_iterator(X, i))
+
+@parallel('multiprocessing')
+def __circular_splits_helper(sp): 
+    from splits import SplitSystem
+    return SplitSystem(sp).is_circular()
+
+@parallel('multiprocessing')
+def __weak_splits_helper(sp):
+    from splits import SplitSystem
+    return SplitSystem(sp).is_weakly_compatible()
+
+def weakly_compatible_splits(n, k):
+    return __splits_checker(n, k, __weak_splits_helper)
+
+def circular_splits(n, k):
+    return __splits_checker(n, k, __circular_splits_helper)
+
+def __splits_checker(n, k, helper):
+    S = all_splits(range(n))
+    J = binomial(S.cardinality(),k)
+    return [splits for (((splits,),kwd),ret)
+            in helper(list(combinations_iterator(S, k))) if ret]
