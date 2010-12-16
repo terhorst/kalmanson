@@ -6,14 +6,9 @@ class Split(object):
         A = Set(A)
         X = Set(X)
         assert A <= X
-        self._X = X
-        self._A = A
-
-    def A(self):
-        return self._A
-
-    def X(self):
-        return self._X
+        self.X = X
+        self.A = A if 1 in A else X - A
+        self.B = X - self.A
 
     def __cmp__(self, other_split):
         return self.blocks().__cmp__(other_split.blocks())
@@ -22,24 +17,21 @@ class Split(object):
         return self.blocks().__hash__()
 
     def __getstate__(self):
-        return {'X': self.X(), 'A': self.A()}
+        return {'X': self.X, 'A': self.A, 'B': self.B}
 
     def __setstate__(self, state):
-        self._X = state['X']
-        self._A = state['A']
-
-    def B(self):
-        return self.X() - self.A()
+        self.X = state['X']
+        self.A = state['A']
+        self.B = state['B']
 
     def __repr__(self):
         return str(self.blocks())
 
     def merge(self, other_split):
-        return Split(self.X(),
-                self.A().intersection(other_split.A()))
+        return Split(self.X, self.A.intersection(other_split.A)) 
 
     def blocks(self):
-        return Set([self.A(), self.B()])
+        return Set([self.A, self.X - self.A])
 
 class SplitSystem(object):
     def __init__(self,splits=[]):
@@ -70,10 +62,10 @@ class SplitSystem(object):
         return it.product(*[x.blocks() for x in lst])
 
     def _split_combinations(self, n):
-        return combinations_iterator(self.splits(), n)
+        return combinations_iterator(self._splits, n)
 
     def is_circular(self):
-        return SplitSystem(self.splits().union(Set(S1.merge(S2)
+        return SplitSystem(self._splits.union(Set(S1.merge(S2)
                     for S1,S2 in self._split_combinations(2)))).is_weakly_compatible()
 
 def all_splits(X):
@@ -98,7 +90,7 @@ def circular_splits(n, k):
     return __splits_checker(n, k, __circular_splits_helper)
 
 def __splits_checker(n, k, helper):
-    S = all_splits(range(n))
+    S = all_splits(range(1, n+1))
     J = binomial(S.cardinality(),k)
     return [splits for (((splits,),kwd),ret)
             in helper(list(combinations_iterator(S, k))) if ret]
