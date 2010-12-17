@@ -52,7 +52,7 @@ class SplitSystem(object):
         return SplitSystem(self._splits.union(other._splits))
 
     def add_split(self, split):
-        self._splits += split
+        return SplitSystem(self._splits + Set([split]))
 
     def __len__(self):
         return self._splits.cardinality()
@@ -113,10 +113,14 @@ def circular_splits(n, k):
 
 @memoized
 def __splits_checker(n, k, helper):
-    S = [SplitSystem([s]) for s in all_splits(n)]
+    allsp = all_splits(n)
+    S = [SplitSystem([s]) for s in allsp]
     if k==1:
         return S
     Snm1 = __splits_checker(n, k-1, helper)
-    ss = filter(lambda ss: len(ss)==k,
+    other_ss = Set(SplitSystem(sp) for sp in combinations_iterator(allsp, k-1)) - Snm1
+    impossible_ss = Set(ss.add_split(sp) for ss,sp in it.product(other_ss, allsp))
+    ss = filter(lambda ss: len(ss)==k and ss not in impossible_ss,
             (ss1.join(ss2) for ss1,ss2 in it.product(S, Snm1)))
+    print len(ss)
     return Set(splits for (((splits,),kwd),ret) in helper(ss) if ret)
