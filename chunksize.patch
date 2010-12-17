@@ -1,0 +1,22 @@
+exporting patch:
+# HG changeset patch
+# User Jonathan Terhorst <terhorst@gmail.com>
+# Date 1292621980 28800
+# Node ID cd9732c1de88830adae2a2d8b9678beb6400d159
+# Parent  120c07be6358d93bcff503363d379c26b8342f2b
+Added chunksize to parallel iterator
+
+diff -r 120c07be6358 -r cd9732c1de88 sage/parallel/multiprocessing_sage.py
+--- a/sage/parallel/multiprocessing_sage.py	Sat Oct 30 16:00:40 2010 -0700
++++ b/sage/parallel/multiprocessing_sage.py	Fri Dec 17 13:39:40 2010 -0800
+@@ -64,7 +64,9 @@
+     p = Pool(processes)
+     fp = pickle_function(f)
+     
+-    result = p.imap_unordered(call_pickled_function, [ (fp, t) for t in inputs ])
++    args = [ (fp, t) for t in inputs ]
++    chunksize = min(len(args) / processes, 10000)
++    result = p.imap_unordered(call_pickled_function, args, chunksize)
+     for res in result:
+         yield res
+ 
