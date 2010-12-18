@@ -120,7 +120,15 @@ def __splits_checker(n, k, helper):
     Snm1 = __splits_checker(n, k-1, helper)
     other_ss = Set(SplitSystem(sp) for sp in combinations_iterator(allsp, k-1)) - Snm1
     impossible_ss = Set(ss.add_split(sp) for ss,sp in it.product(other_ss, allsp))
-    ss = filter(lambda ss: len(ss)==k and ss not in impossible_ss,
-            (ss1.join(ss2) for ss1,ss2 in it.product(S, Snm1)))
-    print len(ss)
+    if binomial(n, k) > ( len(S) * len(Snm1) ):
+        print "(%i,%i): product method" % (n, k)
+        ss = filter(lambda ss: len(ss)==k and ss not in impossible_ss,
+                (ss1.join(ss2) for ss1,ss2 in it.product(S, Snm1)))
+        print "Done with product"
+    else:
+        print "(%i,%i): combinations method" % (n, k)
+        ss = filter(lambda ss: ss not in impossible_ss,
+                (SplitSystem(sp) for sp in combinations_iterator(allsp, k)))
+        print "Done with combinations"
+    print "(%i,%i): checking %i split systems" % (n, k, len(ss))
     return Set(splits for (((splits,),kwd),ret) in helper(ss) if ret)
