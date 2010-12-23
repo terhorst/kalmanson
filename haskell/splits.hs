@@ -1,3 +1,4 @@
+import System.Environment
 import qualified Data.MemoCombinators as Memo
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
@@ -127,4 +128,7 @@ occurences (x:xs) k
 fVector :: Int -> [Int]
 fVector n = map (Set.size) [ circularSplitSystems n k | k <- [1 .. n*(n-3) `div` 2] ]
 
-main = print $ fVector 5
+main = 
+	do 
+		(n:k:_) <- getArgs
+		print $ Data.Map.map (Set.size) (countLifts (read n) (read k))
