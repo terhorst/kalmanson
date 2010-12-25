@@ -1,4 +1,5 @@
 from sage.all import Set, combinations_iterator, parallel, binomial
+import operator
 import itertools as it
 from memoized import memoized
 
@@ -67,9 +68,12 @@ class SplitSystem(object):
                 for double in self._split_combinations(2)))
 
     def is_weakly_compatible(self):
-        return all(weakly_compatible_helper(Set(blocks))
-                for triple in self._split_combinations(3)
-                for blocks in self._block_product(triple))
+        blockset = [Set(blocks)
+            for triple in self._split_combinations(3)
+            for blocks in self._block_product(triple)]
+        print "weakly compatible"
+        print blockset
+        return all(map(weakly_compatible_helper, blockset))
 
     def _block_product(self, lst):
         return it.product(*[x.blocks() for x in lst])
@@ -78,10 +82,11 @@ class SplitSystem(object):
         return combinations_iterator(self._splits, n)
 
     def is_circular(self):
-        return SplitSystem(self._splits.union(Set(S1.merge(S2)
+        ssp = SplitSystem(self._splits.union(Set(S1.merge(S2)
                     for S1,S2 in self._split_combinations(2)
-                    if S1.B.intersection(S2.B).cardinality() > 0
-                    ))).is_weakly_compatible()
+                    if S1.B.intersection(S2.B).cardinality() > 0)))
+        print ssp
+        return ssp.is_weakly_compatible()
 
 def all_splits(n):
     X = Set(range(1, n+1))
@@ -119,16 +124,23 @@ def __splits_checker(n, k, helper):
         return S
     Snm1 = __splits_checker(n, k-1, helper)
     other_ss = Set(SplitSystem(sp) for sp in combinations_iterator(allsp, k-1)) - Snm1
-    impossible_ss = Set(ss.add_split(sp) for ss,sp in it.product(other_ss, allsp)
-            if sp not in ss.splits())
+    impossible_ss = Set(ss.add_split(sp) for ss,sp in it.product(other_ss, allsp))
     if binomial(n, k) > ( len(S) * len(Snm1) ):
-        print "(%i,%i): product method" % (n, k)
         ss = filter(lambda ss: len(ss)==k and ss not in impossible_ss,
                 (ss1.join(ss2) for ss1,ss2 in it.product(S, Snm1)))
     else:
-        print "(%i,%i): combinations method" % (n, k)
         ss = filter(lambda ss: ss not in impossible_ss,
                 (SplitSystem(sp) for sp in combinations_iterator(allsp, k)))
-    print "(%i,%i): checking %i (possible %i) split systems" % \
-        (n, k, len(ss), binomial(len(allsp), k))
+    print "(%i,%i): checking %i split systems" % (n, k, len(ss))
     return Set(splits for (((splits,),kwd),ret) in helper(ss) if ret)
+
+def makesplit(n, lst):
+    lst = lst if 1 in lst else Set(range(1, n+1)) - Set(lst)
+    return reduce(operator.or_, [2**(n - i) for i in lst])
+
+def splits2hs(n, ss):
+    ret = [] 
+    tpl = "fromList [%s]"
+    for sps in ss:
+        ret.append(tpl % ",".join([str(makesplit(n, sp.A)) for sp in sps.splits()]))
+    return tpl % ", ".join(ret)
