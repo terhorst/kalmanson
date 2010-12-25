@@ -23,6 +23,8 @@ combinationsOf k (x:xs) = map (x:) (combinationsOf (k-1) xs) ++ combinationsOf k
 
 combinations k n = combinationsOf k [1..n]
 
+combinationsOfSet k s = 1
+
 cartProd (set:sets) = let cp = cartProd sets in [x:xs | x <- set, xs <- cp]
 cartProd [] = [[]]
 
@@ -78,15 +80,22 @@ allSplits n = unique [ makeSplit n block | k <- [2..n-2], block <- combinations 
 
 ass :: Int -> Int -> Set.Set SplitSystem
 ass n 1 = Set.fromList [ IntSet.singleton sp | sp <- allSplits n ]
-ass n k = Set.fromList [ IntSet.union a b | a <- Set.toList $ allSplitSystems n (k-1), 	
-											b <- Set.toList $ allSplitSystems n 1 ]
+ass n k = Set.fromList $ map (foldr1 (IntSet.union)) (combinationsOf k (Set.toList $ allSplitSystems n 1))
 allSplitSystems = (Memo.memo2 Memo.integral Memo.integral) ass
 
 css :: Int -> Int -> Set.Set SplitSystem
 css n k = Set.fromList [ s | (s,circ) <- zip ss isCirc, circ == True ] where
-		ss = map (sf) $ combinationsOf k (allSplits n)
+		ss = Set.toList $ possCircularSplitSystems n k
 		isCirc = (parMap rwhnf) (isCircular n) ss
 circularSplitSystems = (Memo.memo2 Memo.integral Memo.integral) css
+
+-- Return all the splits systems in K_n of length k which are invalid
+possCircularSplitSystems :: Int -> Int -> Set.Set SplitSystem
+possCircularSplitSystems n k = Set.difference (allSplitSystems n k) $	
+	Set.fromList [ joinSplitSystems a b | j <- [1 .. (k-1)], 
+						a <- Set.toList $ allSplitSystems n (k - j),
+						b <- Set.toList $ 
+								Set.difference (allSplitSystems n j) (circularSplitSystems n j) ]
 
 -- countLifts :: Int -> Int -> Data.Map.Map Int (Set.Set SplitSystem)
 -- countLifts n k = 
