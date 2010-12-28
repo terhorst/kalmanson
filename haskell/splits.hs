@@ -118,4 +118,9 @@ occurences (x:xs) k
 fVector :: Int -> [Int]
 fVector n = map (Set.size) [ circularSplitSystems n k | k <- [1 .. n*(n-3) `div` 2] ]
 
-main = print $ Set.size (circularSplitSystems 6 5)
+partialfVector :: Int -> Int -> [Int]
+partialfVector n k = map (Set.size) [ circularSplitSystems n j | j <- [1 .. k] ]
+
+main = do
+	(n:k:_) <- getArgs
+	print $ partialfVector (read n) (read k)
