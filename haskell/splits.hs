@@ -98,16 +98,16 @@ possCircularSplitSystems n k = Set.difference (allSplitSystems n k) $
 						b <- Set.toList $ 
 								Set.difference (allSplitSystems n j) (circularSplitSystems n j) ]
 
--- countLifts :: Int -> Int -> Data.Map.Map Int (Set.Set SplitSystem)
--- countLifts n k = 
-	-- let 
-		-- sskm1 = circularSplitSystems n (k-1)
-		-- ss = circularSplitSystems n k
-		-- subs = [ s1 | s1 <- st sskm1, s2 <- st ss, Set.isSubsetOf s1 s2 ]
-	-- in
-		-- Data.Map.fromListWith (Set.union) [ (occurences subs k, sf [k]) | k <- unique subs ]
+countLifts :: Int -> Int -> Data.Map.Map Int (Set.Set SplitSystem)
+countLifts n k = 
+	let 
+		ssm1 = Set.toList $ circularSplitSystems n (k-1)
+		ss = Set.toList $ circularSplitSystems n k
+		subs = [ s1 | s1 <- ssm1, s2 <- ss, IntSet.isSubsetOf s1 s2 ]
+	in
+		Data.Map.fromListWith (Set.union) [ (occurences subs k, Set.fromList [k]) | k <- unique subs ]
 
-unique lst = st $ sf $ lst
+unique lst = Set.toList $ Set.fromList $ lst
 
 occurences [] k = 0
 occurences (x:xs) k 
@@ -123,4 +123,5 @@ partialfVector n k = map (Set.size) [ circularSplitSystems n j | j <- [1 .. k] ]
 
 main = do
 	(n:k:_) <- getArgs
-	print $ partialfVector (read n) (read k)
+	-- print $ partialfVector (read n) (read k)
+	print $ Data.Map.map (Set.size) (countLifts (read n) (read k))
