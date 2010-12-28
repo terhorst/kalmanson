@@ -64,9 +64,10 @@ isWeaklyCompatible n ss = all ((checkTriple n). sf) (combinationsOf 3 $ st ss)
 isCircular :: Int -> SplitSystem -> Bool
 isCircular n ss = isWeaklyCompatible n ss' where
 	comp = maskedComplement n
-	ss' = IntSet.union ss $ sf [ mergeSplits s1 s2 | 
+	ss' = IntSet.union ss $ sf [ mergeSplits a b | 
 		(s1:s2:_) <- combinationsOf 2 $ st ss,
-		(comp s1) .&. (comp s2) > 0 ]
+		(a:b:_) <- cartProd [ [s1, comp s1], [s2, comp s2] ],
+		comp a .&. comp b > 0 ]
 
 joinSplitSystems :: SplitSystem -> SplitSystem -> SplitSystem
 joinSplitSystems ss1 ss2 = IntSet.union ss1 ss2
@@ -80,7 +81,7 @@ allSplits n = unique [ makeSplit n block | k <- [2..n-2], block <- combinations 
 
 ass :: Int -> Int -> Set.Set SplitSystem
 ass n 1 = Set.fromList [ IntSet.singleton sp | sp <- allSplits n ]
-ass n k = Set.fromList $ map (foldr1 (IntSet.union)) (combinationsOf k (Set.toList $ allSplitSystems n 1))
+ass n k = Set.fromList $ map (foldr1 IntSet.union) (combinationsOf k (Set.toList $ allSplitSystems n 1))
 allSplitSystems = (Memo.memo2 Memo.integral Memo.integral) ass
 
 css :: Int -> Int -> Set.Set SplitSystem
@@ -117,7 +118,4 @@ occurences (x:xs) k
 fVector :: Int -> [Int]
 fVector n = map (Set.size) [ circularSplitSystems n k | k <- [1 .. n*(n-3) `div` 2] ]
 
--- main = 
-	-- do 
-		-- (n:k:_) <- getArgs
-		-- print $ Data.Map.map (Set.size) (countLifts (read n) (read k))
+main = print $ Set.size (circularSplitSystems 6 5)
