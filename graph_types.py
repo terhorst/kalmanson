@@ -7,8 +7,14 @@ def all_graph_types(n, k):
     for e in combinations(edges, k):
         g = graphs.CycleGraph(n)
         g.add_edges(e)
-        if all(not g.is_isomorphic(h) for h in ret):
+        match = False
+        for h in ret:
+            if h.is_isomorphic(g):
+                match = True
+                break
+        if not match:
             ret.append(g)
+
     return ret
 
 
