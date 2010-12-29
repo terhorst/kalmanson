@@ -2,6 +2,7 @@ from sage.all import Set, combinations_iterator, parallel, binomial
 import operator
 import itertools as it
 from memoized import memoized
+from kalmanson import ray_to_splits
 
 class Split(object):
     def __init__(self, X, A):
@@ -137,6 +138,10 @@ def __splits_checker(n, k, helper):
 def makesplit(n, lst):
     lst = lst if 1 in lst else Set(range(1, n+1)) - Set(lst)
     return reduce(operator.or_, [2**(n - i) for i in lst])
+
+def split_system_from_cone(n, cone):
+    X = range(1,n+1)
+    return SplitSystem(Split(X, ray_to_splits(n,r)) for r in cone.rays())
 
 def splits2hs(n, ss):
     ret = [] 

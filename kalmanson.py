@@ -7,7 +7,8 @@ import numpy as np
 from itertools import izip_longest, combinations, ifilter, imap, product
 import itertools as it
 from functools import partial
-from sage.all import matrix, binomial, zero_matrix, combinations_iterator, vector, permutation_action
+from sage.all import matrix, binomial, zero_matrix, \
+       combinations_iterator, vector, permutation_action, db, Set
 from memoized import memoized
 import utility_matrices as um
 
@@ -478,10 +479,11 @@ def graph_rays_cones(C):
 def ray_to_splits(n, ray):
     mat = symmetric_matrix(n, ray)
     vec = ray_sign_vector(mat)
-    ns = range(1,n+1)
+    ns = range(n)
     pos = Set(ind for s,ind in zip(vec, ns) if s==1)
     neg = Set(ns) - pos
-    return pos if 1 in pos else neg
+    A = pos if 0 in pos else neg
+    return Set([A, Set(ns) - A]) 
     if pos.cardinality() < neg.cardinality():
          return pos
     elif pos.cardinality() == neg.cardinality():
@@ -609,3 +611,6 @@ def cones_fun(n, k):
         if c in cones:
             print prod(symmetric_matrix(n, ray) for ray in r).change_ring(GF(2))
             print ""
+
+def cone_to_split_system(n, cone):
+    return Set(ray_to_splits(n, r) for r in cone.rays())
