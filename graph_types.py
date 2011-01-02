@@ -18,7 +18,8 @@ def graph_types(n, k):
 
 @parallel(p_iter='multiprocessing')
 def match_split_system(ss):
-    from graph_types import graph_types, permute_ss, split_edges, edge_to_split
+    from graph_types import graph_types, permute_ss, \
+            split_edges, edge_to_split, split_len, graph_to_ss
     n = sum(map(len, ss[0]))
     k = len(ss)
     gt = graph_types(n,k)
