@@ -65,8 +65,8 @@ isCircular :: Int -> SplitSystem -> Bool
 isCircular n ss = isWeaklyCompatible n ss' where
 	comp = maskedComplement n
 	ss' = IntSet.union ss $ sf [ mergeSplits a b | 
-		(s1:s2:_) <- combinationsOf 2 $ st ss,
-		(a:b:_) <- cartProd [ [s1, comp s1], [s2, comp s2] ],
+		[s1,s2] <- combinationsOf 2 $ st ss,
+		[a,b] <- cartProd [ [s1, comp s1], [s2, comp s2] ],
 		comp a .&. comp b > 0 ]
 
 joinSplitSystems :: SplitSystem -> SplitSystem -> SplitSystem
@@ -122,6 +122,6 @@ partialfVector :: Int -> Int -> [Int]
 partialfVector n k = map (Set.size) [ circularSplitSystems n j | j <- [1 .. k] ]
 
 main = do
-	(n:k:_) <- getArgs
+	[n,k] <- getArgs
 	-- print $ partialfVector (read n) (read k)
 	print $ Data.Map.map (Set.size) (countLifts (read n) (read k))
