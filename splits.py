@@ -3,6 +3,7 @@ import operator
 import itertools as it
 from memoized import memoized
 from kalmanson import ray_to_splits
+from pq_split_system import PQSplitSystem as SplitSystem
 
 class Split(object):
     def __init__(self, X, A):
@@ -10,7 +11,7 @@ class Split(object):
         X = Set(X)
         assert A <= X
         self.X = X
-        self.A = A if 1 in A else X - A
+        self.A = A if min(X) in A else X - A
         self.B = X - self.A
 
     def __cmp__(self, other_split):
@@ -36,71 +37,11 @@ class Split(object):
     def blocks(self):
         return Set([self.A, self.X - self.A])
 
-class SplitSystem(object):
-    def __init__(self,splits=[]):
-        self._splits = Set(splits)
-
-    def __repr__(self):
-        return "Split system: " + self._splits.__repr__()
-
-    def __cmp__(self, other):
-        return self._splits.__cmp__(other._splits)
-
-    def __hash__(self):
-        return self._splits.__hash__()
-
-    def join(self, other):
-        "Join self to the split system other."
-        return SplitSystem(self._splits.union(other._splits))
-
-    def add_split(self, split):
-        return SplitSystem(self._splits + Set([split]))
-
-    def __len__(self):
-        return self._splits.cardinality()
-
-    def splits(self):
-        return self._splits
-
-    def is_compatible(self):
-        return all(
-                any(A.intersection(B).cardinality()==0 \
-                for A,B in self._block_product(double)
-                for double in self._split_combinations(2)))
-
-    def is_weakly_compatible(self):
-        blockset = [Set(blocks)
-            for triple in self._split_combinations(3)
-            for blocks in self._block_product(triple)]
-        print "weakly compatible"
-        print blockset
-        return all(map(weakly_compatible_helper, blockset))
-
-    def _block_product(self, lst):
-        return it.product(*[x.blocks() for x in lst])
-
-    def _split_combinations(self, n):
-        return combinations_iterator(self._splits, n)
-
-    def is_circular(self):
-        ssp = SplitSystem(self._splits.union(Set(S1.merge(S2)
-                    for S1,S2 in self._split_combinations(2)
-                    if S1.B.intersection(S2.B).cardinality() > 0)))
-        print ssp
-        return ssp.is_weakly_compatible()
-
 def all_splits(n):
     X = Set(range(1, n+1))
     return Set(Split(X,b) for i in range(2, X.cardinality() - 1) \
             for b in combinations_iterator(X, i))
 
-@memoized
-def weakly_compatible_helper(S):
-    A1,A2,A3 = S
-    return A1.intersection(A2).intersection(A3).cardinality() == 0 or \
-        (A1 - A2 - A3).cardinality() == 0 or \
-        (A2 - A1 - A3).cardinality() == 0 or \
-        (A3 - A1 - A2).cardinality() == 0
 
 @parallel(p_iter='multiprocessing')
 def __circular_splits_helper(sp):
@@ -117,6 +58,9 @@ def weakly_compatible_splits(n, k):
 def circular_splits(n, k):
     return __splits_checker(n, k, __circular_splits_helper)
 
+def fvector(n):
+    return [len(circular_splits(n,k)) for k in range(1, n*(n-3)/2 + 1)]
+
 @memoized
 def __splits_checker(n, k, helper):
     allsp = all_splits(n)
@@ -132,7 +76,6 @@ def __splits_checker(n, k, helper):
     else:
         ss = filter(lambda ss: ss not in impossible_ss,
                 (SplitSystem(sp) for sp in combinations_iterator(allsp, k)))
-    print "(%i,%i): checking %i split systems" % (n, k, len(ss))
     return Set(splits for (((splits,),kwd),ret) in helper(ss) if ret)
 
 def makesplit(n, lst):

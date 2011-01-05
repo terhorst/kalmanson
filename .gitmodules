@@ -1,0 +1,3 @@
+[submodule "pq-trees"]
+	path = pq-trees
+	url = git@github.com:terhorst/pq-trees.git
