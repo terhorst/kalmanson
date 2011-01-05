@@ -1,4 +1,5 @@
-from sage.all import Set, combinations_iterator, parallel, binomial
+# Parallel code
+from sage.all import Set, combinations_iterator, binomial
 import operator
 import itertools as it
 from memoized import memoized
@@ -42,41 +43,31 @@ def all_splits(n):
     return Set(Split(X,b) for i in range(2, X.cardinality() - 1) \
             for b in combinations_iterator(X, i))
 
+def check_circular(ss):
+    return [ss, ss.is_circular()]
 
-@parallel(p_iter='multiprocessing')
-def __circular_splits_helper(sp):
-    return sp.is_circular()
-
-@parallel(p_iter='multiprocessing')
-def __weak_splits_helper(sp):
-    from splits import SplitSystem
-    return SplitSystem(sp).is_weakly_compatible()
-
-def weakly_compatible_splits(n, k):
-    return __splits_checker(n, k, __weak_splits_helper)
-
+@memoized
 def circular_splits(n, k):
-    return __splits_checker(n, k, __circular_splits_helper)
+    from sage.parallel.ncpus import ncpus
+    from multiprocessing import Pool
+    from sage.misc.fpickle import pickle_function, call_pickled_function
+    from twisted.internet import reactor   # do not delete this (!)  -- see trac 8785
+
+    allsp = all_splits(n)
+
+    if k==1:
+        return [SplitSystem([s]) for s in allsp]
+
+    Snk1 = circular_splits(n, k-1)
+    Snk = (ss.add_split(sp) for ss in Snk1 for sp in allsp if not ss.contains(sp))
+
+    p = Pool(ncpus())
+    chunksize = min(1000, int(len(Snk1) * len(allsp) / ncpus()))
+    res = p.imap_unordered(check_circular, Snk, chunksize)
+    return Set(ss for ss,circ in res if circ)
 
 def fvector(n):
     return [len(circular_splits(n,k)) for k in range(1, n*(n-3)/2 + 1)]
-
-@memoized
-def __splits_checker(n, k, helper):
-    allsp = all_splits(n)
-    S = [SplitSystem([s]) for s in allsp]
-    if k==1:
-        return S
-    Snm1 = __splits_checker(n, k-1, helper)
-    other_ss = Set(SplitSystem(sp) for sp in combinations_iterator(allsp, k-1)) - Snm1
-    impossible_ss = Set(ss.add_split(sp) for ss,sp in it.product(other_ss, allsp))
-    if binomial(n, k) > ( len(S) * len(Snm1) ):
-        ss = filter(lambda ss: len(ss)==k and ss not in impossible_ss,
-                (ss1.join(ss2) for ss1,ss2 in it.product(S, Snm1)))
-    else:
-        ss = filter(lambda ss: ss not in impossible_ss,
-                (SplitSystem(sp) for sp in combinations_iterator(allsp, k)))
-    return Set(splits for (((splits,),kwd),ret) in helper(ss) if ret)
 
 def makesplit(n, lst):
     lst = lst if 1 in lst else Set(range(1, n+1)) - Set(lst)
@@ -87,7 +78,7 @@ def split_system_from_cone(n, cone):
     return SplitSystem(Split(X, ray_to_splits(n,r)) for r in cone.rays())
 
 def splits2hs(n, ss):
-    ret = [] 
+    ret = []
     tpl = "fromList [%s]"
     for sps in ss:
         ret.append(tpl % ",".join([str(makesplit(n, sp.A)) for sp in sps.splits()]))

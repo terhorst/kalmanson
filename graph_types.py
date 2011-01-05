@@ -2,6 +2,7 @@ from sage.all import graphs, parallel, permutations, Set, floor, SymmetricGroup,
 from itertools import combinations
 from memoized import memoized
 from kalmanson import kalmanson_fan, cone_to_split_system
+from autodb import autodb
 
 @memoized
 def graph_types(n, k):
@@ -68,7 +69,22 @@ def edge_to_split(n, edge):
     A = Set(range(a,b))
     return Set([A, Set(range(n)) - A])
 
+@autodb
 def kalmanson_graph_types(n, k):
     cones = kalmanson_fan(n)(k)
     ss = [cone_to_split_system(n, cone) for cone in cones]
     return list(match_split_system(ss))
+
+def process_graph_types(kgt):
+    sp = kgt[0][0][0][0]
+    n = len(sp[0][0].union(sp[0][1]))
+    k = len(sp)
+    print n,k
+    gt = graph_types(n,k)
+    gss = map(graph_to_ss, gt)
+    m1 = dict(zip(gss, gt))
+    m2 = {}
+    for _,g in kgt:
+        ss = graph_to_ss(g)
+        m2[ss] = m2.get(ss,0) + 1
+    return [(m1[ss], m2.get(ss,0)) for ss in gss]

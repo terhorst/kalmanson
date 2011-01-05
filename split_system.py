@@ -30,8 +30,14 @@ class SplitSystem(object):
     def add_split(self, split):
         return SplitSystem(self._splits + Set([split]))
 
+    def contains(self, split):
+        return split in self._splits
+
     def __len__(self):
         return self._splits.cardinality()
+
+    def __iter__(self):
+        self._splits.__iter__()
 
     def splits(self):
         return self._splits

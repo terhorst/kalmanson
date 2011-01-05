@@ -8,7 +8,7 @@ from itertools import izip_longest, combinations, ifilter, imap, product
 import itertools as it
 from functools import partial
 from sage.all import matrix, binomial, zero_matrix, \
-       combinations_iterator, vector, permutation_action, db, Set
+       combinations_iterator, vector, permutation_action, db, Set, Fan
 from memoized import memoized
 import utility_matrices as um
 
