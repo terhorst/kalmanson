@@ -483,7 +483,7 @@ def ray_to_splits(n, ray):
     pos = Set(ind for s,ind in zip(vec, ns) if s==1)
     neg = Set(ns) - pos
     A = pos if 0 in pos else neg
-    return Set([A, Set(ns) - A]) 
+    return Set([A, Set(ns) - A])
     if pos.cardinality() < neg.cardinality():
          return pos
     elif pos.cardinality() == neg.cardinality():
