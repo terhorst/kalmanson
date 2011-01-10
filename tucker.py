@@ -1,8 +1,9 @@
+from consecutive_ones import circular_ones
 from matrify import matrify
 import numpy as np
 from memoized import memoized
-from itertools import combinations
-from sage.all import matrix, SymmetricGroup, permutation_action, uniq
+from itertools import combinations, imap
+from sage.all import matrix, SymmetricGroup, permutation_action, uniq, Set
 
 def __base_matrix(n,k):
     base = [1,1] + [0]*n
@@ -60,4 +61,31 @@ def submatrix_configurations(S):
 
 @memoized
 def ss_to_matrix(n, ss):
-    return matrix(np.vstack([split_to_vector(n,sp) for sp in ss]))
+    M = matrix(np.vstack([split_to_vector(n,sp) for sp in ss]))
+    M.set_immutable()
+    return M
+
+def incomp_tucker(n,k,S):
+    return filter(lambda M: matrix_contains(M,S),
+            (ss_to_matrix(n,ss) for ss in circular_ones(n,k,True)))
+
+def matrices_with_cols(mats, cols):
+    cols = map(tuple, cols)
+    return filter(lambda M: sorted(cols) in
+            imap(sorted, combinations(map(tuple, M.columns()), len(cols))),
+            mats)
+
+def classify_mats(mats):
+    d = {}
+    for m in mats:
+        cols = map(tuple, list(m.columns())[:-1])
+        map(cols.remove, [(1,0,1),(0,1,1),(1,1,0)])
+        M = matrix(sorted(matrix(cols).transpose()))
+        M.set_immutable()
+        d[M] = d.get(M,0) + 1
+
+    for k,v in sorted(d.iteritems(), key=lambda tup:tup[1]):
+        print "%s: %i \n" % (k,v)
+
+    return d
+
