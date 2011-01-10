@@ -1,9 +1,11 @@
+from multiprocessing import Pool, cpu_count
 from consecutive_ones import circular_ones
 from matrify import matrify
 import numpy as np
 from memoized import memoized
-from itertools import combinations, imap
+from itertools import combinations, imap, izip, repeat
 from sage.all import matrix, SymmetricGroup, permutation_action, uniq, Set
+from progressbar import ProgressBar
 
 def __base_matrix(n,k):
     base = [1,1] + [0]*n
@@ -65,9 +67,17 @@ def ss_to_matrix(n, ss):
     M.set_immutable()
     return M
 
+def __incomp_helper(tup):
+    n,ss,S = tup
+    M = ss_to_matrix(n,ss)
+    return (ss,matrix_contains(M,S))
+
 def incomp_tucker(n,k,S):
-    return filter(lambda M: matrix_contains(M,S),
-            (ss_to_matrix(n,ss) for ss in circular_ones(n,k,True)))
+    # ss = ProgressBar()(circular_ones(n,k,True))
+    ss = circular_ones(n,k,True)
+    args = izip(repeat(n),ss,repeat(S))
+    p = Pool(cpu_count())
+    ret = [ss for ss,cont in p.imap_unordered(__incomp_helper, args) if cont]
 
 def matrices_with_cols(mats, cols):
     cols = map(tuple, cols)
