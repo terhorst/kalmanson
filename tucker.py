@@ -3,8 +3,8 @@ from consecutive_ones import circular_ones
 from matrify import matrify
 import numpy as np
 from memoized import memoized
-from itertools import combinations, imap, izip, repeat
-from sage.all import matrix, SymmetricGroup, permutation_action, uniq, Set
+from itertools import combinations, imap, izip, repeat, starmap
+from sage.all import matrix, SymmetricGroup, permutation_action, uniq, Set, partitions, multinomial
 from progressbar import ProgressBar
 
 def __base_matrix(n,k):
@@ -52,12 +52,18 @@ def matrix_contains(M, S):
     configs = submatrix_configurations(S)
     return any(sm in configs for sm in all_submatrices(M, m, n))
 
-def submatrix_configurations(S):
+def orbit(S):
     m,n = (S.nrows(), S.ncols())
     Sr = SymmetricGroup(m)
     Sc = SymmetricGroup(n)
-    configs = [ permutation_action(h, permutation_action(g, S).transpose()).transpose()
-            for g in Sr for h in Sc ]
+    return [ 
+        permutation_action(h, permutation_action(g, S).transpose()).transpose()
+        for g in Sr for h in Sc
+        ]
+
+@memoized
+def submatrix_configurations(S):
+    configs = orbit(S)
     [m.set_immutable() for m in configs]
     return uniq(configs)
 
@@ -68,16 +74,20 @@ def ss_to_matrix(n, ss):
     return M
 
 def __incomp_helper(tup):
-    n,ss,S = tup
-    M = ss_to_matrix(n,ss)
-    return (ss,matrix_contains(M,S))
+    n,M,S = tup
+    return (M,matrix_contains(M,S))
 
-def incomp_tucker(n,k,S):
+def incomp_tucker(n,k,S,parallel=True):
     # ss = ProgressBar()(circular_ones(n,k,True))
-    ss = circular_ones(n,k,True)
-    args = izip(repeat(n),ss,repeat(S))
-    p = Pool(cpu_count())
-    ret = [ss for ss,cont in p.imap_unordered(__incomp_helper, args) if cont]
+    ss = [ ss_to_matrix(n,ss) for ss in circular_ones(n,k,True) ]
+    if parallel:
+        p = Pool(cpu_count())
+        args = izip(repeat(n),ss,repeat(S))
+        iter = p.imap_unordered(__incomp_helper, args, 1000)
+    else:
+        args = izip(repeat(n),ProgressBar()(ss),repeat(S))
+        iter = imap(__incomp_helper, args)
+    return [ss for ss,cont in iter if cont]
 
 def matrices_with_cols(mats, cols):
     cols = map(tuple, cols)
@@ -85,17 +95,44 @@ def matrices_with_cols(mats, cols):
             imap(sorted, combinations(map(tuple, M.columns()), len(cols))),
             mats)
 
+def interesting_permutations(S):
+    m,n = (S.nrows(), S.ncols())
+    Sr = SymmetricGroup(m)
+    Sc = SymmetricGroup(n)
+    try:
+        ( (g,h) for g in Sr for h in Sc 
+            if g != Sr.identity() and h != Sc.identity() and 
+            S == permutation_action(h, permutation_action(g, S).transpose()).transpose() ).next()
+    except StopIteration:
+        return 0
+    return 1
+
+@memoized
 def classify_mats(mats):
     d = {}
-    for m in mats:
+    numones = {}
+    sys_col = [(1,0,1),(0,1,1),(1,1,0)]
+    pb = ProgressBar()(mats)
+    for m in pb:
         cols = map(tuple, list(m.columns())[:-1])
-        map(cols.remove, [(1,0,1),(0,1,1),(1,1,0)])
-        M = matrix(sorted(matrix(cols).transpose()))
+        map(cols.remove, sys_col)
+        M = matrix(cols).transpose()
         M.set_immutable()
-        d[M] = d.get(M,0) + 1
-
-    for k,v in sorted(d.iteritems(), key=lambda tup:tup[1]):
-        print "%s: %i \n" % (k,v)
-
+        Mcs = submatrix_configurations(M)
+        try:
+            k = (k for k in d.keys() if k in Mcs).next()
+            d[k] += 1
+        except StopIteration:
+            d[M] = 1
     return d
 
+def mat_class_pp(d):
+    sys_col = [(1,0,1),(0,1,1),(1,1,0)]
+    n = d.keys()[0].ncols() + 3
+    mtable = dict(zip(starmap(multinomial, partitions(n)), partitions(n)))
+    for k,v in sorted(d.iteritems(), key=lambda tup:tup[1]):
+        cols = k.columns()
+        rows = k.rows()
+        [c.set_immutable() for c in cols]
+        [r.set_immutable() for r in rows]
+        print "%s %s: %i \n" % (k, mtable.get(v, "??"), v)
