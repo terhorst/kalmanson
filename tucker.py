@@ -3,9 +3,14 @@ from consecutive_ones import circular_ones
 from matrify import matrify
 import numpy as np
 from memoized import memoized
-from itertools import combinations, imap, izip, repeat, starmap
-from sage.all import matrix, SymmetricGroup, permutation_action, uniq, Set, partitions, multinomial
+from itertools import combinations, imap, izip, repeat, starmap, product
+from sage.all import matrix, SymmetricGroup, permutation_action, uniq, \
+        Set, partitions, multinomial, vector
 from progressbar import ProgressBar
+
+M1_COL = [(1,0,1),(0,1,1),(1,1,0)]
+ALL_COL = list(product([0,1], repeat=3))
+NONM1_COL = [c for c in ALL_COL if c not in M1_COL]
 
 def __base_matrix(n,k):
     base = [1,1] + [0]*n
@@ -60,6 +65,16 @@ def orbit(S):
         permutation_action(h, permutation_action(g, S).transpose()).transpose()
         for g in Sr for h in Sc
         ]
+
+def col_permutation_action(g, M):
+    M = permutation_action(g, M.transpose()).transpose()
+    M.set_immutable()
+    return M
+
+def row_orbit(M):
+    mats = [permutation_action(g, M) for g in SymmetricGroup(M.nrows())]
+    [m.set_immutable() for m in mats]
+    return mats
 
 @memoized
 def submatrix_configurations(S):
@@ -127,7 +142,6 @@ def classify_mats(mats):
     return d
 
 def mat_class_pp(d):
-    sys_col = [(1,0,1),(0,1,1),(1,1,0)]
     n = d.keys()[0].ncols() + 3
     mtable = dict(zip(starmap(multinomial, partitions(n)), partitions(n)))
     for k,v in sorted(d.iteritems(), key=lambda tup:tup[1]):
@@ -136,3 +150,19 @@ def mat_class_pp(d):
         [c.set_immutable() for c in cols]
         [r.set_immutable() for r in rows]
         print "%s %s: %i \n" % (k, mtable.get(v, "??"), v)
+
+def class_mats_m1(lst):
+    d = {0:[],1:[],2:[]}
+
+    for M in lst:
+        x = sum(min(1, M.columns().count(vector(c))) for c in SYS_COL)
+        d[x].append(M)
+
+    return d
+
+def construct_lift(M, v):
+    M2 = M.matrix_from_columns(range(M.ncols() - 1))
+    M2 = M2.augment(matrix([v, [0]*3]).transpose())
+    M2.set_immutable()
+    return M2
+

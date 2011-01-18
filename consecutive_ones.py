@@ -1,5 +1,5 @@
 from multiprocessing import Pool, cpu_count
-import operator
+import operator, random
 from itertools import *
 from pqtree import PQTree
 from math import factorial
@@ -52,3 +52,23 @@ def num_circular_ones(m,n):
 def fvector(n):
     for k in range(1, n*(n-3)/2 + 1):
         print num_circular_ones(n,k)
+
+
+def random_combination_with_replacement(iterable, r):
+    "Random selection from itertools.combinations_with_replacement(iterable, r)"
+    pool = tuple(iterable)
+    n = len(pool)
+    indices = sorted(random.randrange(n) for i in xrange(r))
+    return tuple(pool[i] for i in indices)
+
+def find_c1p(m,n):
+    while True:
+        rows = random_combination_with_replacement(mypowerset(range(n)), m)
+        pqt = PQTree(range(n))
+        if pqt.ReduceAll(list(rows)):
+            print pqt
+            print pqt.Frontier()
+            return rows
+        else:
+            print 1
+
