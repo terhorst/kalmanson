@@ -247,13 +247,13 @@ def permutation_vector(g):
     M = permutation_action(g,permutation_action(g,M).transpose()).transpose()
     perm_vec = list(np.array(M)[triu_indices(n, 1)])
     return perm_vec
-        
+
 def permuted_kalmanson_matrix(A, perm):
     pv = permutation_vector(perm)
     M = matrix(np.vstack([np.array(r)[pv] for r in A.rows()]))
     M.set_immutable()
     return M
-   
+
 def set_of_kalmanson_matrices(n):
     "Return the set of all distinct Kalmanson nxn matrices."
     A = kalmanson_matrix(n)
@@ -336,12 +336,14 @@ def rays(n):
     "The rays associated with the standard Kalmanson inequalities on n taxa."
     ret = []
     for i in range(2, n-1):
+        print i
         ret.append(um.V(n, i))
 
     for i in range(1, n-2):
         for j in range(i+2, n):
+            print (i,j)
             ret.append(um.V(n,i,j))
-    
+
     return ret
 
 def all_rays(n, Cn=None):
@@ -372,12 +374,7 @@ def ray_sign_pattern(R):
     return "".join(map(d.get, sv))
 
 def ray_sign_vector(R):
-    def SignAlternator():
-        i = -1
-        while True:
-            i *= -1
-            yield i
-    sa = SignAlternator()
+    sa = it.cycle([-1,1])
     v = vector([s for s,i in zip(sa, block_structure(R)) for k in range(i) ])
     v.set_immutable()
     return v

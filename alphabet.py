@@ -1,7 +1,7 @@
 from memoized import memoized
 from consecutive_ones import circular_ones
 from tucker import ss_to_matrix, row_orbit
-from sage.all import matrix, vector, prod
+from sage.all import matrix, vector, prod, uniq
 from itertools import permutations, product, imap
 from progressbar import ProgressBar
 
@@ -45,15 +45,18 @@ def count_structure(n, sty="S1"):
     rows = []
     for i in pat:
         if i==1:
-            rows.append([(1,) * n])
+            rows.append([(0,) + ((1,)*(n-2)) + (0,)])
         elif i==0:
-            rows.append([l for l in permutations([0]*(n-1) + [1])])
+            rows.append([(0,)+l+(1,) for l in permutations((0,)*(n-3) + (1,))])
         else:
-            rows.append([l for l in product([0,1], repeat=n)
-                if l.count(1) > 1 and l.count(1) < n])
+            rows.append([(0,)+l for l in product([0,1], repeat=n-1)
+                if l.count(1) > 1 and l.count(0) < n-2])
+
+    print rows
 
     ret = []
-    for M in ProgressBar(maxval=prod(map(len, rows)))(imap(matrix, product(*rows))):
+    proditer = ([p1,p2,p3] for p1,p2,p3 in product(*rows) if p1!=p2 and p2!=p3 and p1!=p3)
+    for M in ProgressBar(maxval=prod(map(len, rows)))(imap(matrix, proditer)):
         if not any(S in ret for S in row_orbit(M)):
             ret.append(M)
 
