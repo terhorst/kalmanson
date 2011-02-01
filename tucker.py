@@ -43,6 +43,8 @@ def m5():
 @memoized
 def split_to_vector(n, split):
     v = np.zeros(n, dtype=int)
+    split = split if 0 not in split else \
+        [i for i in range(n) if i not in split]
     v[list(split)]=1
     return v
 
