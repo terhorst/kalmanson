@@ -50,9 +50,7 @@ def num_circular_ones(m,n):
     return len(circular_ones(m,n))
 
 def fvector(n):
-    for k in range(1, n*(n-3)/2 + 1):
-        print num_circular_ones(n,k)
-
+    return [ num_circular_ones(n,k) for k in range(1, n*(n-3)/2 + 1) ]
 
 def random_combination_with_replacement(iterable, r):
     "Random selection from itertools.combinations_with_replacement(iterable, r)"
