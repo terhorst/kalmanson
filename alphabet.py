@@ -12,6 +12,7 @@ ALPHA = dict(zip(((1,1,0),(1,0,1),(0,1,1),(1,0,0),
 I = map(vector, [(1,1,0),(0,1,1),(1,0,1)])
 II = map(vector, [(1,0,0),(0,1,0),(0,0,1)])
 III = [vector((1,1,1))]
+IV = [vector((0,0,0))]
 
 S = {
         'S1': (1, 0, 'X'),
@@ -32,19 +33,25 @@ def __get_mats(n):
     return [ss_to_matrix(n, ss) for ss in circular_ones(n, 3)]
 
 @memoized
-def F(i,j,k,mats):
+def F(i,j,k,l,mats):
     return filter(lambda M: sum(vector(S) in M.columns() for S in I)==i and
                     sum(vector(S) in M.columns() for S in II)==j and
-                    sum(vector(S) in M.columns() for S in III)==k,
+                    sum(vector(S) in M.columns() for S in III)==k and
+                    sum(vector(S) in M.columns()[1:] for S in IV)==l,
                     mats)
 
 def all_F(mats):
-    d = dict(((i,j,k),F(i,j,k,mats)) for i in range(4) for j in range(5) for k in range(2))
+    d = dict(((i,j,k,l),F(i,j,k,l,mats)) 
+            for i in range(len(I)+1)
+            for j in range(len(II)+1) 
+            for k in range(len(III)+1)
+            for l in range(len(IV)+1))
     print_d(d)
     return d
 
 def print_d(d):
-    for k,v in d.iteritems():
+    for k in sorted(d.keys()):
+        v = d[k]
         if len(v)>0:
             print "%s: %i" % (str(k),len(v))
 
@@ -69,20 +76,6 @@ def count_structure(n, sty="S1"):
 
     return ret
 
-def checkit(n):
-    mats = __get_mats(n-1)
-    aF = all_F(mats)
-    print sum((i+j+1) * v for (i,j),v in aF.iteritems())
-    for k in S.keys():
-        print k
-        print len(count_structure(n, k))
-
-def Sij(n):
-    mats = [(M, M.submatrix(0,0,ncols=n-1)) for M in __get_mats(n)]
-    mats_nm1 = __get_mats(n-1)
-    ret = []
-    for M0,M in mats:
-        if any(S in mats_nm1 for S in row_orbit(M)):
-                ret.append(M0)
-    return ret
+def contains_configuration(lst, M):
+    return any(S in lst for S in row_orbit(M))
 

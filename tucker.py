@@ -63,10 +63,15 @@ def orbit(S):
     m,n = (S.nrows(), S.ncols())
     Sr = SymmetricGroup(m)
     Sc = SymmetricGroup(n)
-    return [ 
+    ret = []
+    mats = [ 
         permutation_action(h, permutation_action(g, S).transpose()).transpose()
         for g in Sr for h in Sc
         ]
+    for M in mats:
+        if M not in ret:
+            ret.append(M)
+    return ret
 
 def col_permutation_action(g, M):
     M = permutation_action(g, M.transpose()).transpose()
